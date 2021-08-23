@@ -42,31 +42,21 @@ apt install iputils-ping
 2- Creat SA called David 
 
 ```bash
-kubectl create sa David-sa -n storefront
+kubectl create sa david-sa -n storefront
 ```
 
 3- create kubeconfig file for David
 
 ```bash
 # Update these to match your environment
-SERVICE_ACCOUNT_NAME=David-sa
+SERVICE_ACCOUNT_NAME=david-sa
 CONTEXT=$(kubectl config current-context)
 NAMESPACE=storefront
 
-NEW_CONTEXT=David-sa
+NEW_CONTEXT=david-sa
 KUBECONFIG_FILE="kubeconfig-sa"
 
-
-SECRET_NAME=$(kubectl get serviceaccount ${SERVICE_ACCOUNT_NAME} \
-  --context ${CONTEXT} \
-  --namespace ${NAMESPACE} \
-  -o jsonpath='{.secrets[0].name}')
-TOKEN_DATA=$(kubectl get secret ${SECRET_NAME} \
-  --context ${CONTEXT} \
-  --namespace ${NAMESPACE} \
-  -o jsonpath='{.data.token}')
-
-TOKEN=$(echo ${TOKEN_DATA} | base64 -d)
+TOKEN=$(kubectl get secret -n storefront $(kubectl get serviceaccount david-sa -n storefront -o jsonpath='{range .secrets[*]}{.name}{"\n"}{end}' | grep token) -o go-template='{{.data.token | base64decode}}')
 
 # Create dedicated kubeconfig
 # Create a full copy
@@ -142,9 +132,9 @@ metadata:
   name: tigera-packet-capture-role-David
   namespace: storefront
 subjects:
-- kind: User
-  name: David
-  apiGroup: rbac.authorization.k8s.io
+- kind: ServiceAccount
+  name: david-sa
+  namespace: storefront
 roleRef:
   kind: Role
   name: tigera-packet-capture-role
@@ -152,10 +142,9 @@ roleRef:
 EOF
 ```
 
-3- switch users and use david account to apply the packet capture yaml file 
+3- switch users and use david ServiceAccount to apply the packet capture yaml file 
 
 ```bash
-source David_creds.sh
 kubectl apply -f PC-storefront-logging-DNS.yaml
 ```
 
@@ -169,16 +158,35 @@ kubectl exec -it -n storefront logging -- sh -c "ping google.com"
 5 - validate that David can't retrieve 
 
 ```bash
-source David_creds.sh
-calicoctl captured-packets copy pc-storefront-logging-dns --namespace storefront
+# in my lab I am already have a Loadbalancer to expose the cluster over port 9443 so I don't need to create a port forward
+kubectl port-forward -n tigera-manager service/tigera-manager 9443:9443 &
+# Update these to match your environment
+NS=<REPLACE_WITH_PACKETCAPTURE_NS>
+NAME=<REPLACE_WITH_PACKETCAPTURE_NAME>
+TOKEN=<REPLACE_WITH_YOUR_TOKEN>
+curl "https://localhost:9443/packet-capture/download/$NS/$NAME/files.zip" -L -O -k \
+-H "Authorization: Bearer $TOKEN" -vvv
 ```
 
-we should git message similar to the following:
+we should get 403 https response, The client does not have access rights to the content, so the server is refusing to give the requested resource.
+
 
 ```bash
-Unable to get Cluster Information to verify version mismatch: connection is unauthorized: clusterinformations.crd.projectcalico.org "default" is forbidden: User "David" cannot get resource "clusterinformations" in API group "crd.projectcalico.org" at the cluster scope
- Use --allow-version-mismatch to override.%
+< HTTP/2 403
+< content-type: text/plain; charset=utf-8
+< date: Mon, 23 Aug 2021 12:54:28 GMT
+< x-content-type-options: nosniff
+< content-length: 62
 ```
+
+also if you check the logs of the tigera-packetcapture pod you should see "user does not have RBAC permissions" message
+
+```bash
+kubectl logs -n tigera-packetcapture $(kubectl get pods -n tigera-packetcapture -o jsonpath='{.items[0].metadata.name}')
+```
+
+> 2021-08-23 12:53:12.046 [ERROR][1] auth.go 51: failed to authenticate user error=user does not have RBAC permissions for authenticationreviews
+
 
 ## Retriving PCAP file
 
@@ -205,8 +213,9 @@ roleRef:
   kind: ClusterRole
   name: tigera-authentication-clusterrole-David
 subjects:
-- kind: User
-  name: David
+- kind: ServiceAccount
+  name: david-sa
+  namespace: storefront
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -224,9 +233,9 @@ metadata:
   name: tigera-capture-files-role-David
   namespace: storefront
 subjects:
-- kind: User
-  name: David
-  apiGroup: rbac.authorization.k8s.io
+- kind: ServiceAccount
+  name: david-sa
+  namespace: storefront
 roleRef:
   kind: Role
   name: tigera-capture-files-role
@@ -234,71 +243,23 @@ roleRef:
 EOF
 ```
 
-2- because I am planing to retrieve the pcap files using calicoctl, I need to configure RBAC for calicoctl
-
-```bash
-cat <<EOF| kubectl apply -f -
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: calicoctl-captured-packets
-rules:
-- apiGroups: ["crd.projectcalico.org"]
-  resources: ["felixconfigurations"]
-  verbs: ["get", "list"]
-- apiGroups: [""]
-  resources: ["pods"]
-  verbs: ["get", "list"]
-- apiGroups: [""]
-  resources: ["pods/exec"]
-  verbs: ["create"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: calicoctl-captured-packets
-subjects:
-- kind: User
-  name: David
-  apiGroup: rbac.authorization.k8s.io
-roleRef:
-  kind: ClusterRole
-  name: calicoctl-captured-packets
-  apiGroup: rbac.authorization.k8s.io
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: tigera-clusterinformations-clusterrole
-rules:
-- apiGroups: ["crd.projectcalico.org"]
-  resources: ["clusterinformations"]
-  verbs: ["get"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: tigera-clusterinformations-clusterrolebinding
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: tigera-clusterinformations-clusterrole
-subjects:
-- kind: User
-  name: David
-EOF
-```
-
 3- retrieve the files
 
 ```bash
-source David_creds.sh
-calicoctl captured-packets copy pc-storefront-logging-dns --namespace storefront
+# in my lab I am already have a Loadbalancer to expose the cluster over port 9443 so I don't need to create a port forward
+kubectl port-forward -n tigera-manager service/tigera-manager 9443:9443 &
+# Update these to match your environment
+NS=<REPLACE_WITH_PACKETCAPTURE_NS>
+NAME=<REPLACE_WITH_PACKETCAPTURE_NAME>
+TOKEN=<REPLACE_WITH_YOUR_TOKEN>
+curl "https://localhost:9443/packet-capture/download/$NS/$NAME/files.zip" -L -O -k \
+-H "Authorization: Bearer $TOKEN" -vvv
 ```
 
 4- Once you retrive the generated pcap files using the right account you can see that we only captured the UDP/53 traffic 
 
 ```bash
+unzip files.zip
 % sudo tcpdump -ttttnnr  logging_eni00ad604076b.pcap
 reading from file logging_eni00ad604076b.pcap, link-type EN10MB (Ethernet)
 2021-08-17 10:37:35.287477 IP 192.168.24.180.51326 > 10.100.0.10.53: 41554+ A? google.com.storefront.svc.cluster.local. (57)
