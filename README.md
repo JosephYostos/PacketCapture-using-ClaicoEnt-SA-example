@@ -3,7 +3,14 @@
 ## Use Case
 Story:
 DevOps, services team (David, Samantha) are trying to figure out what’s wrong with DNS service as it has seen DNS service degradation several times during the past few days.
+
+![PC1](Images/PC1.png)
+
 Teams notice that a few minutes before every outage there has been a massive amount of requests in addition to packet retransmission coming from the logging pod in the storefront namespace.
+
+![PC2](Images/PC2.png)
+
+
 Why is this happening? The Level-1/Level-2 troubleshooting hasn't provided much context and information to root cause the problem. 
 
 Challenges:
