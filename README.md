@@ -2,7 +2,7 @@
 
 ## Use Case
 Story:
-DevOps, services team (David, Samantha) are trying to figure out what’s wrong with DNS service as it has seen DNS service degradation several times during the past few days.
+DevOps, Plateform Teams (David, Paul) are trying to figure out what’s wrong with DNS service as it has seen DNS service degradation several times during the past few days.
 
 ![PC1](Images/PC1.png)
 
@@ -17,7 +17,7 @@ Challenges:
 The issue happens over the night when no one from the storefront service owners (Samantha) is present to do live troubleshooting. Further, David and Samantha don’t have full access to storefront namespace and cannot run packet capture on this pod.
 
 Requirements:
-David and Samantha need to get access to run Dynamic Packet Capture job in storefront namespace to capture the problem on the CoreDNS and to retrieve the captured files.
+David needs to get access to run Dynamic Packet Capture job in storefront namespace to capture the problem on the CoreDNS and to retrieve the captured files.
 Only David and Samantha should be able to retrieve these files and review.
 Additional filtration is required to do specific capture for faster and targetted review and avoid running out of space to capture the relevant information.
 
