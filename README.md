@@ -282,3 +282,12 @@ reading from file logging_eni00ad604076b.pcap, link-type EN10MB (Ethernet)
 ```bash
 kubectl delete -f pc-storefront-logging-dns.yaml
 ```
+## CE 3.10 Dynamic Packet Capture Enhancements
+
+Ability to access PC via service graph UI
+Ability to rerun/stop a capture job, retrieve and delete capture files, view YAML files and delete a capture job from the UI
+Ability to schedule packet capture
+
+From the service graph view, right-click a namespace, and you can schedule a capture job that selects all workload endpoints within that particular namespace.
+
+
