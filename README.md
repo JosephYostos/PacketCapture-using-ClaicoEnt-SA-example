@@ -290,7 +290,7 @@ Ability to schedule packet capture
 
 From the service graph view, right-click a namespace, and you can schedule a capture job that selects all workload endpoints within that particular namespace.
 
-<img src="Images/DPC-UI-1.png" alt="DPC-UI-1" width="100%"/>
+![DPC-UI-1](Images/DPC-UI-1.png)
 
 ![DPC-UI-2](Images/DPC-UI-2.png)
 
